@@ -86,6 +86,7 @@
     <Compile Include="Assets\scripts\Leg_RB.cs" />
     <Compile Include="Assets\scripts\Leg_RF.cs" />
     <Compile Include="Assets\scripts\Main.cs" />
+    <Compile Include="Assets\scripts\PID.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="GenerateTargetFrameworkMonikerAttribute" />

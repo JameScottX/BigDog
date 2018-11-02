@@ -6,7 +6,7 @@ PhysicMaterial:
   m_PrefabParentObject: {fileID: 0}
   m_PrefabInternal: {fileID: 0}
   m_Name: ground
-  dynamicFriction: 0.9
+  dynamicFriction: 1.2
   staticFriction: 0.9
   bounciness: 0
   frictionCombine: 0

@@ -92,9 +92,32 @@ public class Leg_LB : MonoBehaviour {
     public float Leg_GetAngle(GameObject object_)
     {
 
-        HingeJoint hinge_ = object_.GetComponent<HingeJoint>();
+        float angle = 0;
+        float angle2 = 0;
 
-        float angle_rad = hinge_.angle * Mathf.Deg2Rad;
+        if (object_ == Leg_lb1)
+        {
+            //HingeJoint hinge_ = object_.GetComponent<HingeJoint>();
+
+            angle = object_.transform.localEulerAngles.x;
+
+        }
+        else if (object_ == Leg_lb2)
+        {
+
+            angle = object_.transform.localEulerAngles.z - 360;
+
+
+        }
+        else if (object_ == Leg_lb3)
+        {
+
+            angle2 = 360 - Leg_lb2.transform.localEulerAngles.z;
+            angle = angle2 + object_.transform.localEulerAngles.z;
+
+        }
+
+        float angle_rad = angle * Mathf.Deg2Rad;  //rad标准化
 
         return angle_rad;
 
@@ -124,7 +147,7 @@ public class Leg_LB : MonoBehaviour {
     }
 
 
-    short LimitParam = 2;
+    
 
     public void Leg_SetLimits(GameObject object_, float angle_lim, float speed)
     {
@@ -135,17 +158,17 @@ public class Leg_LB : MonoBehaviour {
 
         JointLimits limits = hinge_.limits;
         JointMotor motor = hinge_.motor;
-        if (angle_lim >= angle_now + 0.001)
+        if (angle_lim >= angle_now + 0.2)
         {
 
-            limits.max = angle_lim + LimitParam;
-            limits.min = angle_now;
+            limits.max = angle_lim ;
+            limits.min = angle_now ;
             motor.targetVelocity = speed;
         }
-        else if (angle_lim + 0.001 < angle_now)
+        else if (angle_lim  < angle_now + 0.2)
         {
 
-            limits.min = angle_lim - LimitParam;
+            limits.min = angle_lim ;
             limits.max = angle_now;
             motor.targetVelocity = -speed;
         }

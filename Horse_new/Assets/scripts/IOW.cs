@@ -7,9 +7,8 @@ public static class Constants
 {
 
     public static double Altitude = 0.3;      //初始的腿部高度
-    public static double []DIR_ = new double[4] { 0.03, 0.02,0.05,0.05} ;          //腿部运动与终点差别
+    public static double []DIR_ = new double[4] { 0.03, 0.01,0.05,0.05} ;          //腿部运动与终点差别
 
-    public static double K_ = 0.2;
 }
 
 public enum Mode
@@ -46,7 +45,6 @@ public enum LegStatus
 
 public class IOW {
 
-    
 
     public struct PML
     {
@@ -58,10 +56,14 @@ public class IOW {
     };
 
     public Kinematics kinematics = new Kinematics();
+    PID pid_H = new PID();   //HOLD 
+    PID pid_W = new PID();   //WALK 
+    PID pid_S = new PID();
 
     public LegStatus LegMode;
     Mode ModeTransition;
 
+    public Mode IOWMode;
 
     LegID []LegChoose = new LegID[2];
 
@@ -90,7 +92,6 @@ public class IOW {
 
     public  void IdeaOfWalkingInit()        //启动初始化
     {
-
         
         PMLInit();
 
@@ -106,16 +107,54 @@ public class IOW {
             targetPos[i].y = LegYAltitude[i];
             targetPos[i].z = 0;
 
-            angle_v[i].swingleg_V = 200;
-            angle_v[i].thign_V = 200;
-            angle_v[i].calf_V = 200;
-
+            angle_v[i].swingleg_V = 400;
+            angle_v[i].thign_V = 400;
+            angle_v[i].calf_V = 400;
 
         }
 
 
+        pid_H.PID_Init(0.15, 0, 0.02, 0.06,-0.05);
+        pid_W.PID_Init( 0.15,0,0.02,0.05,-0.05);
+        pid_S.PID_Init(0.04, 0, 0.02, 0.05, -0.05);
 
     }
+
+    /// <summary>
+    /// 腿部运动长度默认初始化
+    /// </summary>
+    void PMLInit()
+    {   //默认步长初始化
+
+        int c;
+
+        for (c = 0; c < 4; c++)
+        {
+
+            HoldMotionLen[c].xLen = 0;
+            HoldMotionLen[c].yLen = (float)0.1;
+            HoldMotionLen[c].zLen = (float)0;
+
+            StopMotionLen[c].xLen = 0;
+            StopMotionLen[c].yLen = 0;
+            StopMotionLen[c].zLen = 0;
+
+            WalkMotionLen[c].xLen = (float)0.15;
+            WalkMotionLen[c].yLen = (float)0.1;
+            WalkMotionLen[c].zLen = (float)0;
+
+            Ta[c] = (4 * WalkMotionLen[c].yLen) / (Mathf.Pow(WalkMotionLen[c].xLen, 2));
+            Tb[c] = (float)(Constants.Altitude - WalkMotionLen[c].yLen);
+
+
+            RunMotionLen[c].xLen = (float)0.1;
+            RunMotionLen[c].yLen = (float)0.06;
+            RunMotionLen[c].zLen = 0;
+
+        }
+
+    }
+
 
     public void IdeaOfWalking(Mode mode) {
 
@@ -141,7 +180,7 @@ public class IOW {
 
                     if (Mathf.Abs(pos.x - targetPos[i].x) <= Constants.DIR_[0] &&
                              Mathf.Abs(pos.y - targetPos[i].y) <= Constants.DIR_[0] &&
-                        Mathf.Abs(pos.z - targetPos[i].z) <= Constants.DIR_[0]+0.04)
+                        Mathf.Abs(pos.z - targetPos[i].z) <= Constants.DIR_[0])
                     {
 
                         count++;
@@ -149,18 +188,15 @@ public class IOW {
 
                     }
 
-                    pos.x += (float)Constants.K_ * (targetPos[i].x - pos.x);
-                    pos.y += (float)Constants.K_ * (targetPos[i].y - pos.y);
-                    pos.z += (float)Constants.K_* (targetPos[i].z - pos.z);
-
-
-                     //Debug.Log(pos.z.ToString() + "-" + pos.z.ToString() + "-" + pos.z.ToString());
-                   
+                    pos.x += (float)pid_H.PD_cal(pos.x, targetPos[i].x);
+                    pos.y += (float)pid_H.PD_cal(pos.y, targetPos[i].y);
+                    pos.z += (float)pid_H.PD_cal(pos.z, targetPos[i].z);
 
                     angle = kinematics.IK(pos.x, pos.y, pos.z);
-
+                    
                     angle = rad2deg(angle);
-
+                   
+                    
                     targetAngle[i].swingleg = angle.swingleg;
                     targetAngle[i].thign = angle.thign;
                     targetAngle[i].calf = angle.calf;
@@ -178,9 +214,9 @@ public class IOW {
                     pos = kinematics.DK(nowAngle[i].swingleg, nowAngle[i].thign, nowAngle[i].calf);
 
 
-                    if (Mathf.Abs(pos.x - targetPos[i].x) <= Constants.DIR_[0] &&
-                             Mathf.Abs(pos.y - targetPos[i].y) <= Constants.DIR_[0] &&
-                        Mathf.Abs(pos.z - targetPos[i].z) <= Constants.DIR_[0] + 0.02)
+                    if (Mathf.Abs(pos.x - targetPos[i].x) <= Constants.DIR_[1] &&
+                             Mathf.Abs(pos.y - targetPos[i].y) <= Constants.DIR_[1] &&
+                        Mathf.Abs(pos.z - targetPos[i].z) <= Constants.DIR_[1])
                     {
 
                         count++;
@@ -188,9 +224,9 @@ public class IOW {
 
                     }
 
-                    pos.x += (float)Constants.K_ * (targetPos[i].x - pos.x);
-                    pos.y += (float)Constants.K_ * (targetPos[i].y - pos.y);
-                    pos.z += (float)Constants.K_  * (targetPos[i].z - pos.z);
+                    pos.x += (float)pid_S.PD_cal(pos.x, targetPos[i].x);
+                    pos.y += (float)pid_S.PD_cal(pos.y, targetPos[i].y);
+                    pos.z += (float)pid_S.PD_cal(pos.z, targetPos[i].z);
 
                     angle = kinematics.IK(pos.x, pos.y, pos.z);
 
@@ -206,7 +242,6 @@ public class IOW {
 
             case Mode.Walk:    //function: watch, keep balance
 
-
                 WalkCruve();
 
                 for (; i < 4; i++)
@@ -215,32 +250,31 @@ public class IOW {
                     pos = kinematics.DK(nowAngle[i].swingleg, nowAngle[i].thign, nowAngle[i].calf);
 
                     if (Mathf.Abs(pos.x - targetPos[i].x) <= Constants.DIR_[2] &&
-                                Mathf.Abs(pos.y - targetPos[i].y) <= Constants.DIR_[2] &&
+                        Mathf.Abs(pos.y - targetPos[i].y) <= Constants.DIR_[2]  &&
                          Mathf.Abs(pos.z - targetPos[i].z) <= Constants.DIR_[2])
                     {
-
                         count++;
                         continue;
 
                     }
 
-                    pos.x += (float)Constants.K_ * (targetPos[i].x - pos.x);
-                    
+                    pos.x += (float)pid_W.PD_cal(pos.x, targetPos[i].x);
+
                     if (i == (short)LegChoose[0] || i == (short)LegChoose[1])//抬腿动作
                     {
 
                         // pos.y += ((HoldMotionLen[i].yLen * Mathf.Cos(Mathf.PI / HoldMotionLen[i].xLen * pos.x)) - (float)Constants.Altitude);
-                        pos.y = (-Ta[i] * Mathf.Pow(pos.x,2) - Tb[i]);
-                        
+                        pos.y = (-Ta[i] * Mathf.Pow(pos.x, 2) - Tb[i]);
 
                     }
                     else   //腿落地动作
                     {
-                        
-                        pos.y += (float)Constants.K_ * (targetPos[i].y - pos.y);
+
+                        pos.y += (float)0.6*(float)pid_W.PD_cal(pos.y, targetPos[i].y);
                     }
 
-                    pos.z += (float)Constants.K_ * (targetPos[i].z - pos.z);
+                    pos.z += (float)pid_W.PD_cal(pos.z, targetPos[i].z); 
+  
 
                     angle = kinematics.IK(pos.x, pos.y, pos.z);
 
@@ -394,6 +428,7 @@ public class IOW {
         }
     }
 
+
     void StopCurve() {
 
         short i = 0;
@@ -407,9 +442,9 @@ public class IOW {
             for (; i < 4; i++)
             {
 
-                targetPos[i].x = 0;
+                targetPos[i].x = StopMotionLen[i].xLen;
                 targetPos[i].y = LegYAltitude[i];
-                targetPos[i].z = 0;
+                targetPos[i].z = StopMotionLen[i].zLen;
             }
             return;
         }
@@ -439,12 +474,9 @@ public class IOW {
                     LegMode = LegStatus.Leg_FRLB_DOWNING;
                 }
             }
-
-
-            ModeTransition = mode;
+        
         }
-
-
+        ModeTransition = mode;
 
     }
 
@@ -461,7 +493,7 @@ public class IOW {
             
             if (LegMode == LegStatus.Leg_FLRB_UPING)
             {
-                //Debug.Log("LegLoop");
+
                 LegMode = LegStatus.Leg_FLRB_DOWNING;
 
             }
@@ -513,12 +545,9 @@ public class IOW {
 
             }
 
-
-
         }
         else if (mode == Mode.Stop)
         {
-
 
             LegMode = LegStatus.Leg_ALL_DOWN;
 
@@ -531,39 +560,7 @@ public class IOW {
     }
 
 
-    /// <summary>
-    /// 腿部运动长度默认初始化
-    /// </summary>
-    void PMLInit() {   //默认步长初始化
 
-        int c;
-
-        for (c = 0; c < 4; c++)
-        {
-
-            HoldMotionLen[c].xLen = 0;
-            HoldMotionLen[c].yLen = (float)0.08;
-            HoldMotionLen[c].zLen = (float)0;
-
-            StopMotionLen[c].xLen = 0;
-            StopMotionLen[c].yLen = 0;
-            StopMotionLen[c].zLen = 0;
-
-            WalkMotionLen[c].xLen = (float)0.12;
-            WalkMotionLen[c].yLen = (float)0.09;
-            WalkMotionLen[c].zLen = (float)0;
-
-            Ta[c] = (4 * WalkMotionLen[c].yLen) / (Mathf.Pow(WalkMotionLen[c].xLen ,2));
-            Tb[c] = (float)(Constants.Altitude - WalkMotionLen[c].yLen);
-
-
-            RunMotionLen[c].xLen = (float)0.1;
-            RunMotionLen[c].yLen = (float)0.06;
-            RunMotionLen[c].zLen = 0;
-
-        }
-
-    }
 
 
     /// <summary>
